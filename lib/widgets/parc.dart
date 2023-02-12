@@ -15,7 +15,7 @@ class Parc {
 
   factory Parc.fromJson(Map<String, dynamic> json) {
     return Parc(
-      pnr: json["pnr"],
+      pnr: json["pnr"] ?? "Unknown PNR",
       id: json["id"],
       geoShape: json["geo_shape"],
       additionalInfo: json,
@@ -27,23 +27,3 @@ class Parc {
     return "[$id] $pnr: ${geoShape?["geometry"]["coordinates"].length ?? 0} points";
   }
 }
-
-class Parcs {
-  final List<Parc> parcList;
-
-  const Parcs({
-    required this.parcList,
-  });
-
-  factory Parcs.fromJson(Map<String, dynamic> json) {
-    var parcList = List<Parc>.empty(growable: true);
-    for (var i = 0; i < json["records"].length; i++) {
-      parcList.add(Parc.fromJson(json["records"][i]["record"]["fields"]));
-    }
-
-    return Parcs(
-      parcList: parcList,
-    );
-  }
-}
-
