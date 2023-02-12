@@ -159,4 +159,6 @@ class _CustomCrsPageState extends State<CustomCrsPage> {
       ),
     );
   }
+
+  buildDrawer(BuildContext context, String route) {}
 }
