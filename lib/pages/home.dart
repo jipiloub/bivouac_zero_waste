@@ -1,6 +1,5 @@
-import 'package:bivouac_legal_flutter/widgets/home_map.dart';
 import 'package:flutter/material.dart';
-import 'package:bivouac_legal_flutter/widgets/parc_loader.dart';
+import 'package:bivouac_zero_waste/widgets/home_map.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);

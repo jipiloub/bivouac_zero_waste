@@ -1,4 +1,4 @@
-# bivouac_legal_flutter
+# bivouac_zero_waste
 
 A new Flutter project.
 

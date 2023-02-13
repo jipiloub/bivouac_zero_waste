@@ -1,6 +1,5 @@
-import 'package:bivouac_legal_flutter/pages/home.dart';
 import 'package:flutter/material.dart';
-
+import 'package:bivouac_zero_waste/pages/home.dart';
 
 void main() {
   runApp(const MyApp());
@@ -19,7 +18,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const HomePage()
+      home: const HomePage(),
     );
   }
 }

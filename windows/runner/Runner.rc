@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "bivouac_legal_flutter" "\0"
+            VALUE "FileDescription", "bivouac_zero_waste" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "bivouac_legal_flutter" "\0"
+            VALUE "InternalName", "bivouac_zero_waste" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2023 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "bivouac_legal_flutter.exe" "\0"
-            VALUE "ProductName", "bivouac_legal_flutter" "\0"
+            VALUE "OriginalFilename", "bivouac_zero_waste.exe" "\0"
+            VALUE "ProductName", "bivouac_zero_waste" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

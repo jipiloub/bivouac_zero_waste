@@ -1,4 +1,4 @@
-import 'package:bivouac_legal_flutter/classes/parc.dart';
+import 'package:bivouac_zero_waste/classes/parc.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
@@ -27,7 +27,7 @@ class _ParcsLoaderState extends State<ParcsLoader> {
       future: parcList.futureParcList,
       builder: (context, snapshot) {
         if (snapshot.hasData) {
-          return Text(snapshot.data!.length.toString());
+          return Text("${snapshot.data!.length.toString()} parcs");
         } else if (snapshot.hasError) {
           throw Exception('${snapshot.error}');
         }

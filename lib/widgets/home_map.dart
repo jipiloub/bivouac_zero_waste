@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:bivouac_legal_flutter/widgets/parc_loader.dart';
+import 'package:bivouac_zero_waste/widgets/parc_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geojson/geojson.dart';
@@ -87,6 +87,7 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
           color: Colors.white,
           child:
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text("${clickedPoint.x.toStringAsFixed(6)}, ${clickedPoint.y.toStringAsFixed(6)}"),
               ParcsLoader()
