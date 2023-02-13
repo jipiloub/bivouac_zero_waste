@@ -1,7 +1,9 @@
-import 'package:bivouac_legal_flutter/widgets/parc.dart';
+import 'package:bivouac_legal_flutter/classes/parc.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:geojson/geojson.dart';
 
 class ParcsLoader extends StatefulWidget {
   const ParcsLoader({Key? key}) : super(key: key);
@@ -56,8 +58,15 @@ class ParcList {
 
   Future<List<Parc>> get futureParcList => _futureParcList;
 
+  int get parcCount => _parcList.length;
+
   //short setters
   void addParcList(Parc parc) => _parcList.add(parc);
+
+  @override
+  String toString() {
+    return "$parcCount parcs";
+  }
 }
 
 Future<List<Parc>> fetchParcs(List<Parc> parcList) async {
@@ -75,21 +84,42 @@ Future<List<Parc>> fetchParcs(List<Parc> parcList) async {
   int totalCount = jsonDecode(response.body)["total_count"];
   print("Retrieving $totalCount parcs...");
 
+  List<Future<dynamic>> response_futures = [];
   for (var offset = 0; offset < totalCount + limit; offset += limit) {
-    final response = await http.get(Uri.parse(
-        'https://data.laregion.fr/api/v2/catalog/datasets/parcs-naturels-regionaux/records?limit=$limit&offset=$offset'));
+    response_futures.add(http.get(Uri.parse(
+        'https://data.laregion.fr/api/v2/catalog/datasets/parcs-naturels-regionaux/records?limit=$limit&offset=$offset')));
+  }
+
+  final responses = await Future.wait(response_futures);
+
+  for (var response in responses) {
     if (response.statusCode == 200) {
       var json = jsonDecode(response.body);
-      // If the server did return a 200 OK response,
-      // then parse the JSON.
+      // If the server did return a 200 OK response, then parse the JSON.
       for (var i = 0; i < json["records"].length; i++) {
-        parcList.add(Parc.fromJson(json["records"][i]["record"]["fields"]));
+        final fields = json["records"][i]["record"]["fields"];
+        final parcName = fields["pnr"];
+        final geo_shape = fields["geo_shape"];
+
+        // If no name or no geo_shape, skip
+        if (parcName == null || geo_shape == null) {
+          if (kDebugMode) {
+            print("Skipping parc ${parcName ?? ''}");
+          }
+          continue;
+        }
+
+        // Add the parc to the list
+        parcList.add(Parc.fromJson(fields));
+        if (kDebugMode) {
+          print("New parc $parcName");
+        }
       }
     } else {
       // If the server did not return a 200 OK response,
       // then throw an exception.
       throw Exception(
-          'Failed to load parcs with offset $offset and limit $limit');
+          'Failed to load some parcs');
     }
   }
   print(

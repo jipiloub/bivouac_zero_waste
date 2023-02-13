@@ -32,6 +32,7 @@ dependencies:
   positioned_tap_detector_2: ^1.0.4
   http: ^0.13.5
   geojson: ^1.0.0
+  map_controller_plus: ^2.0.0
 
 dev_dependencies:
   flutter_test:
