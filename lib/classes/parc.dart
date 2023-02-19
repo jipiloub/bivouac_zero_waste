@@ -1,6 +1,3 @@
-import 'package:geojson/geojson.dart';
-
-
 class Parc {
   final String name;
   final int id;
@@ -20,7 +17,10 @@ class Parc {
     // The GeoJson plugin is not so flexible. Eventually need to do some wrapping.
     late Map<String, dynamic> geo_shape;
     if (json["geo_shape"]["type"] != "FeatureCollection") {
-      geo_shape = {"type": "FeatureCollection", "features": [json["geo_shape"]]};
+      geo_shape = {
+        "type": "FeatureCollection",
+        "features": [json["geo_shape"]]
+      };
     } else {
       geo_shape = json["geo_shape"];
     }

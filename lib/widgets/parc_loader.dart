@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:geojson/geojson.dart';
 
 class ParcsLoader extends StatefulWidget {
   const ParcsLoader({Key? key}) : super(key: key);
@@ -118,8 +117,7 @@ Future<List<Parc>> fetchParcs(List<Parc> parcList) async {
     } else {
       // If the server did not return a 200 OK response,
       // then throw an exception.
-      throw Exception(
-          'Failed to load some parcs');
+      throw Exception('Failed to load some parcs');
     }
   }
   print(

@@ -19,12 +19,13 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0-204.0.dev <4.0.0'
+  sdk: ">=2.18.0 <3.0.0"
 
 scripts:
   # run is a default script. To use it, simply type
   # in the command line: "rps" - that's all!
   run: "flutter build web --output /Users/jpl/StudioProjects/jipiloub.github.io"
+  publish_map_controller: "cp -R ./lib/map_controller_plus/* /Users/jpl/StudioProjects/map_controller_plus/lib"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -36,13 +37,12 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_map: ^3.1.0
-  geojson: ^1.0.0
   http: ^0.13.5
   latlong2: ^0.8.1
   location: ^4.4.0
-  map_controller_plus: ^2.0.0
   positioned_tap_detector_2: ^1.0.4
   proj4dart: ^2.1.0
+  rxdart: ^0.27.5
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
