@@ -4,9 +4,11 @@ import 'dart:math';
 
 import 'package:bivouac_zero_waste/classes/geojson.dart';
 import 'package:bivouac_zero_waste/widgets/parc_loader.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geodesy/geodesy.dart';
 import 'package:proj4dart/proj4dart.dart' as proj4;
 import 'package:latlong2/latlong.dart';
 
@@ -25,34 +27,32 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
 
   final polygons = <Polygon>[];
   final circles = <CircleMarker>[];
-  CircleMarker? circleClickedLocation;
+  String clickedParc = "";
+
+  Geodesy geodesy = Geodesy();
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize clicked point. This will update the status bar
-    clickedPoint = initialCenter;
-
-    // Load parcs
+    // Trigger parc loading
     parcList = ParcList();
 
     // EPSG:4326 is a predefined projection ships with proj4dart
     epsg4326 = proj4.Projection.get('EPSG:4326')!;
 
-    /// [Important] listen to the changefeed to rebuild the map on changes:
-    /// this will rebuild the map when for example addMarker or any method
-    /// that mutates the map assets is called
+    // Wait for parc loading and display them
     displayParcs();
+
+    // Initialize clicked point. This will update the status bar
+    clickedPoint = initialCenter;
   }
 
   void displayParcs() async {
     await parcList.futureParcList;
 
     for (final parc in parcList.parcs) {
-      final features = Geojson().digest_feature_collection(parc.geojsonFeature);
-
-      for (final feature in features) {
+      for (final feature in parc.features) {
         setState(() {
           if (feature.type == FeatureType.Polygon ||
               feature.type == FeatureType.MultiPolygon) {
@@ -63,10 +63,10 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
     }
   }
 
-  void displayCircleAtClick(point) {
+  void displayCircleAtClick(LatLng point) {
     setState(() {
       clickedPoint = point;
-      circleClickedLocation = CircleMarker(
+      CircleMarker circleClickedLocation = CircleMarker(
           point: point,
           radius: 4,
           color: Colors.lightBlue.withOpacity(0.3),
@@ -81,13 +81,58 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
     });
   }
 
+  void checkIfClickedInParcs(LatLng point) async {
+    await parcList.futureParcList;
+
+    for (final parc in parcList.parcs) {
+      for (final feature in parc.features) {
+        late bool isInPolygon;
+        if (feature.type == FeatureType.Polygon) {
+          if (geodesy.isGeoPointInPolygon(point, feature.points)) {
+            setState(() {
+              clickedParc = parc.name;
+            });
+            if (kDebugMode) {
+              print("Clicked in ${parc.toString()}");
+            }
+            return;
+          }
+        } else if (feature.type == FeatureType.MultiPolygon) {
+          if (geodesy.isGeoPointInPolygon(point, feature.outer)) {
+            // If point is in the outer polygon, check if it is in one of the
+            // inner polygons.
+            for (final innerPolygon in feature.innerList) {
+              if (geodesy.isGeoPointInPolygon(point, innerPolygon)) {
+                // In an inner polygon: this is not included in the parc
+                setState(() {
+                  clickedParc = "";
+                });
+                return;
+              }
+            }
+            setState(() {
+              clickedParc = parc.name;
+            });
+            if (kDebugMode) {
+              print("Clicked in ${parc.toString()}");
+            }
+            return;
+          }
+        }
+      }
+    }
+
+    setState(() {
+      clickedParc = "";
+    });
+  }
+
   String getFormattedClickedLocation() {
     return "${clickedPoint.latitude.toStringAsFixed(6)}, ${clickedPoint.longitude.toStringAsFixed(6)}";
   }
 
   @override
   Widget build(BuildContext context) {
-    final key = GlobalKey<ScaffoldState>();
     return Column(
       children: [
         Flexible(
@@ -96,9 +141,10 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
             center: initialCenter,
             zoom: 9,
             interactiveFlags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-            onTap: (tapPosition, p) => setState(() {
+            onTap: (tapPosition, p) {
               displayCircleAtClick(p);
-            }),
+              checkIfClickedInParcs(p);
+            },
           ),
           nonRotatedChildren: [
             AttributionWidget.defaultWidget(
@@ -126,8 +172,19 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
                   GestureDetector(
                     child: Text(getFormattedClickedLocation()),
                     onLongPress: () {
-                      Clipboard.setData(ClipboardData(text: getFormattedClickedLocation()));
-                      final snackBar = SnackBar(content: Text("Copied to Clipboard"));
+                      Clipboard.setData(
+                          ClipboardData(text: getFormattedClickedLocation()));
+                      const snackBar =
+                          SnackBar(content: Text("Copied to Clipboard"));
+                      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+                    },
+                  ),
+                  GestureDetector(
+                    child: Text(clickedParc),
+                    onLongPress: () {
+                      Clipboard.setData(ClipboardData(text: clickedParc));
+                      const snackBar =
+                          SnackBar(content: Text("Copied to Clipboard"));
                       ScaffoldMessenger.of(context).showSnackBar(snackBar);
                     },
                   ),

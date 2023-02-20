@@ -1,13 +1,17 @@
+import 'geojson.dart';
+
 class Parc {
   final String name;
   final int id;
   final Map<String, dynamic> geojsonFeature;
+  final List<dynamic> features;
   final Map<String, dynamic> additionalInfo;
 
   const Parc({
     required this.name,
     required this.id,
     required this.geojsonFeature,
+    required this.features,
     required this.additionalInfo,
   });
 
@@ -24,10 +28,12 @@ class Parc {
     } else {
       geo_shape = json["geo_shape"];
     }
+    final features = Geojson().digest_feature_collection(geo_shape);
     return Parc(
       name: json["pnr"],
       id: json["id"],
       geojsonFeature: geo_shape,
+      features: features,
       additionalInfo: json,
     );
   }
