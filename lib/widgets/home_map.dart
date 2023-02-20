@@ -86,7 +86,6 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
 
     for (final parc in parcList.parcs) {
       for (final feature in parc.features) {
-        late bool isInPolygon;
         if (feature.type == FeatureType.Polygon) {
           if (geodesy.isGeoPointInPolygon(point, feature.points)) {
             setState(() {
@@ -101,13 +100,15 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
           if (geodesy.isGeoPointInPolygon(point, feature.outer)) {
             // If point is in the outer polygon, check if it is in one of the
             // inner polygons.
-            for (final innerPolygon in feature.innerList) {
-              if (geodesy.isGeoPointInPolygon(point, innerPolygon)) {
-                // In an inner polygon: this is not included in the parc
-                setState(() {
-                  clickedParc = "";
-                });
-                return;
+            if (feature.innerList != null) {
+              for (final innerPolygon in feature.innerList) {
+                if (geodesy.isGeoPointInPolygon(point, innerPolygon)) {
+                  // In an inner polygon: this is not included in the parc
+                  setState(() {
+                    clickedParc = "";
+                  });
+                  return;
+                }
               }
             }
             setState(() {
