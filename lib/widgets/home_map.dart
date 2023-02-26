@@ -185,8 +185,6 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
               //   updateVisibleParcs();
               // }
               onMapEvent: (mapEvent) {
-                print(mapEvent.runtimeType);
-                print(getPlatform());
                 if (mapEvent.runtimeType == MapEventMoveEnd) {
                   updateVisibleParcs();
                 }
