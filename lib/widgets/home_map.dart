@@ -3,14 +3,15 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:bivouac_zero_waste/classes/geojson.dart';
+import 'package:bivouac_zero_waste/classes/helper.dart';
 import 'package:bivouac_zero_waste/widgets/parc_loader.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geodesy/geodesy.dart';
 import 'package:proj4dart/proj4dart.dart' as proj4;
 import 'package:latlong2/latlong.dart';
+import "package:stack_trace/stack_trace.dart";
 
 class HomeMapWidget extends StatefulWidget {
   const HomeMapWidget({Key? key}) : super(key: key);
@@ -23,17 +24,20 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
   late final proj4.Projection epsg4326;
   late ParcList parcList;
   late LatLng clickedPoint;
-  final initialCenter = LatLng(46.41640616670052, 5.992162595827724);
+  late final MapController _mapController;
 
+  final initialCenter = LatLng(46.41640616670052, 5.992162595827724);
   final polygons = <Polygon>[];
   final circles = <CircleMarker>[];
-  String clickedParc = "";
 
-  Geodesy geodesy = Geodesy();
+  String clickedParc = "";
 
   @override
   void initState() {
     super.initState();
+
+    // Instantiate an empty map controller
+    _mapController = MapController();
 
     // Trigger parc loading
     parcList = ParcList();
@@ -42,94 +46,122 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
     epsg4326 = proj4.Projection.get('EPSG:4326')!;
 
     // Wait for parc loading and display them
-    displayParcs();
+    updateVisibleParcs();
 
     // Initialize clicked point. This will update the status bar
     clickedPoint = initialCenter;
   }
 
-  void displayParcs() async {
-    await parcList.futureParcList;
-
-    for (final parc in parcList.parcs) {
-      for (final feature in parc.features) {
-        setState(() {
-          if (feature.type == FeatureType.Polygon ||
-              feature.type == FeatureType.MultiPolygon) {
-            polygons.add(feature.convertToFlutterMap());
-          }
-        });
-      }
-    }
-  }
-
   void displayCircleAtClick(LatLng point) {
+    clickedPoint = point;
+    CircleMarker circleClickedLocation = CircleMarker(
+        point: point,
+        radius: 4,
+        color: Colors.lightBlue.withOpacity(0.3),
+        borderColor: Colors.blue,
+        borderStrokeWidth: 0.5);
     setState(() {
-      clickedPoint = point;
-      CircleMarker circleClickedLocation = CircleMarker(
-          point: point,
-          radius: 4,
-          color: Colors.lightBlue.withOpacity(0.3),
-          borderColor: Colors.blue,
-          borderStrokeWidth: 0.5);
       // Empty the circle list
       while (circles.isNotEmpty) {
         circles.removeLast();
       }
       // Add the new circle
-      circles.add(circleClickedLocation!);
+      circles.add(circleClickedLocation);
     });
   }
 
   void checkIfClickedInParcs(LatLng point) async {
     await parcList.futureParcList;
+    final start_time = DateTime.now().millisecondsSinceEpoch;
+    if (kDebugMode) {
+      print("");
+    }
 
     for (final parc in parcList.parcs) {
-      for (final feature in parc.features) {
-        if (feature.type == FeatureType.Polygon) {
-          if (geodesy.isGeoPointInPolygon(point, feature.points)) {
-            setState(() {
-              clickedParc = parc.name;
-            });
-            if (kDebugMode) {
-              print("Clicked in ${parc.toString()}");
-            }
-            return;
-          }
-        } else if (feature.type == FeatureType.MultiPolygon) {
-          if (geodesy.isGeoPointInPolygon(point, feature.outer)) {
-            // If point is in the outer polygon, check if it is in one of the
-            // inner polygons.
-            if (feature.innerList != null) {
-              for (final innerPolygon in feature.innerList) {
-                if (geodesy.isGeoPointInPolygon(point, innerPolygon)) {
-                  // In an inner polygon: this is not included in the parc
-                  setState(() {
-                    clickedParc = "";
-                  });
-                  return;
-                }
-              }
-            }
-            setState(() {
-              clickedParc = parc.name;
-            });
-            if (kDebugMode) {
-              print("Clicked in ${parc.toString()}");
-            }
-            return;
-          }
+      final feature = parc.geojsonFeature;
+      if (feature.isInGeoJsonFeature(point)) {
+        setState(() {
+          clickedParc = parc.name;
+        });
+        if (kDebugMode) {
+          print("Clicked in ${parc.toString()}");
+          print(
+              "${Trace.current().frames[0].member}: ${DateTime.now().millisecondsSinceEpoch - start_time}ms");
         }
+        return;
       }
     }
 
     setState(() {
       clickedParc = "";
     });
+    if (kDebugMode) {
+      print(
+          "${Trace.current().frames[0].member}: ${DateTime.now().millisecondsSinceEpoch - start_time}ms");
+    }
   }
 
   String getFormattedClickedLocation() {
     return "${clickedPoint.latitude.toStringAsFixed(6)}, ${clickedPoint.longitude.toStringAsFixed(6)}";
+  }
+
+  void updateVisibleParcs() async {
+    await parcList.futureParcList;
+    final start_time = DateTime.now().millisecondsSinceEpoch;
+
+    if (kDebugMode) {
+      print("");
+    }
+
+    final currentViewBounds = _mapController.bounds ?? LatLngBounds();
+    if (currentViewBounds.isValid == false) {
+      print("WARNING: current view has no bounds");
+      return;
+    }
+    print(
+        "View bounds: [[${currentViewBounds.east}, ${currentViewBounds.west}],"
+        " [${currentViewBounds.north}, ${currentViewBounds.south}]");
+
+    // Remove displayed polygons
+    setState(() {
+      while (polygons.isNotEmpty) {
+        polygons.removeLast();
+      }
+    });
+
+    for (final parc in parcList.parcs) {
+      switch (parc.geojsonFeature.type) {
+        case FeatureType.GeoJsonPolygon:
+          {
+            final feature = parc.geojsonFeature as GeoJsonPolygon;
+            if (currentViewBounds.isOverlapping(feature.latLngBounds)) {
+              print("${parc.name} is in the view");
+              setState(() {
+                polygons.add(feature.convertToFlutterMapFormat());
+              });
+            }
+          }
+          break;
+        case FeatureType.GeoJsonMultiPolygon:
+          {
+            final feature = parc.geojsonFeature as GeoJsonMultiPolygon;
+            if (currentViewBounds.isOverlapping(feature.latLngBounds)) {
+              print("${parc.name} is in the view");
+              setState(() {
+                polygons.addAll(feature.convertToFlutterMapFormat());
+              });
+            }
+          }
+          break;
+        default:
+          {
+            throw Exception("Error: Unknown type: ${parc.geojsonFeature.type}");
+          }
+      }
+    }
+
+    print(
+        "${Trace.current().frames[0].member}: ${DateTime.now().millisecondsSinceEpoch - start_time}ms");
   }
 
   @override
@@ -138,15 +170,34 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
       children: [
         Flexible(
             child: FlutterMap(
+          mapController: _mapController,
           options: MapOptions(
-            center: initialCenter,
-            zoom: 9,
-            interactiveFlags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-            onTap: (tapPosition, p) {
-              displayCircleAtClick(p);
-              checkIfClickedInParcs(p);
-            },
-          ),
+              center: initialCenter,
+              zoom: 9,
+              interactiveFlags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+              onTap: (tapPosition, p) {
+                displayCircleAtClick(p);
+                checkIfClickedInParcs(p);
+              },
+              // Update the visible parcs while the map is moving. Does not seem
+              // to work on phones.
+              // onPositionChanged: (a, b) {
+              //   updateVisibleParcs();
+              // }
+              onMapEvent: (mapEvent) {
+                print(mapEvent.runtimeType);
+                print(getPlatform());
+                if (mapEvent.runtimeType == MapEventMoveEnd) {
+                  updateVisibleParcs();
+                }
+                if (getPlatform() != PlatformCustom.webMobile) {
+                  if (mapEvent.runtimeType == MapEventFlingAnimation ||
+                      mapEvent.runtimeType == MapEventScrollWheelZoom ||
+                      mapEvent.runtimeType == MapEventMove) {
+                    updateVisibleParcs();
+                  }
+                }
+              }),
           nonRotatedChildren: [
             AttributionWidget.defaultWidget(
               source: 'OpenStreetMap contributors',

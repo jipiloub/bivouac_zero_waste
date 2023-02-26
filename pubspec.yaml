@@ -34,6 +34,7 @@ scripts:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  cupertino_icons: ^1.0.2
   flutter:
     sdk: flutter
   flutter_map: ^3.1.0
@@ -44,10 +45,8 @@ dependencies:
   positioned_tap_detector_2: ^1.0.4
   proj4dart: ^2.1.0
   rxdart: ^0.27.5
-
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.2
+  stack_trace: ^1.11.0
+  universal_html: ^2.0.9
 
 dev_dependencies:
   flutter_test:
