@@ -9,12 +9,10 @@ enum FeatureType {
   GeoJsonMultiPolygon,
 }
 
-GeoJsonFeature digestFeatureCollection(
-    Map<String, dynamic> featureCollection) {
+GeoJsonFeature digestFeatureCollection(Map<String, dynamic> featureCollection) {
   late final GeoJsonFeature geometry;
   if (kDebugMode) {
     print("");
-    print("Features count: ${featureCollection["features"].length}");
     if (featureCollection["features"].length > 1) {
       print("WARNING: more features than expected for this parc");
     }
@@ -32,7 +30,7 @@ GeoJsonFeature digestFeatureCollection(
         final coordinates = feature["geometry"]["coordinates"];
         if (kDebugMode && coordinates.length > 1) {
           print(
-            "WARNING: this Polygon has too much points lists: ${coordinates.length}");
+              "WARNING: this Polygon has too much points lists: ${coordinates.length}");
         }
         if (kDebugMode) {
           print("Polygon count: ${coordinates.length}");
@@ -84,15 +82,23 @@ abstract class GeoJsonFeature {
   late final LatLngBounds _latLngBounds;
 
   FeatureType get type => _type;
+
   LatLngBounds get latLngBounds => _latLngBounds;
 
-  dynamic convertToFlutterMapFormat();
+  List<Polygon> convertToFlutterMapFormat(
+      {Color? color, Color? borderColor, bool? isFilled});
+
   bool isInGeoJsonFeature(LatLng point);
+
+  bool isInFeatureBounds(LatLng point) {
+    return _latLngBounds.contains(point);
+  }
 }
 
 class GeoJsonPolygon extends GeoJsonFeature {
   // Define the outer shape
   final List<LatLng> _points;
+
   // Define shapes in the outer shape that should be excluded
   final List<List<LatLng>>? _innerPointsList;
 
@@ -109,15 +115,18 @@ class GeoJsonPolygon extends GeoJsonFeature {
   List<List<LatLng>>? get innerPointsList => _innerPointsList;
 
   @override
-  Polygon convertToFlutterMapFormat(
-      [Color? color, Color? borderColor, bool? isFilled]) {
-    return Polygon(
-      points: _points,
-      holePointsList: _innerPointsList,
-      color: color ?? Colors.redAccent.withOpacity(0.2),
-      borderColor: borderColor ?? Colors.red,
-      isFilled: isFilled ?? true,
-    );
+  List<Polygon> convertToFlutterMapFormat(
+      {Color? color, Color? borderColor, bool? isFilled}) {
+    return [
+      Polygon(
+        points: _points,
+        holePointsList: _innerPointsList,
+        color: color ?? Colors.blue.withOpacity(0.2),
+        borderColor: borderColor ?? Colors.blueAccent,
+        borderStrokeWidth: 1.0,
+        isFilled: isFilled ?? true,
+      )
+    ];
   }
 
   @override
@@ -151,10 +160,11 @@ class GeoJsonMultiPolygon extends GeoJsonFeature {
 
   @override
   List<Polygon> convertToFlutterMapFormat(
-      [Color? color, Color? borderColor, bool? isFilled]) {
+      {Color? color, Color? borderColor, bool? isFilled}) {
     final polygons = <Polygon>[];
     for (GeoJsonPolygon polygon in _polygons) {
-      polygons.add(polygon.convertToFlutterMapFormat());
+      polygons.addAll(polygon.convertToFlutterMapFormat(
+          color: color, borderColor: borderColor, isFilled: isFilled));
     }
     return polygons;
   }

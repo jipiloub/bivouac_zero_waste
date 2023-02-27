@@ -1,8 +1,12 @@
 import 'package:bivouac_zero_waste/classes/parc.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
+
+import '../classes/geojson.dart';
 
 class ParcsLoader extends StatefulWidget {
   const ParcsLoader({Key? key}) : super(key: key);
@@ -60,7 +64,27 @@ class ParcList {
   int get parcCount => _parcList.length;
 
   //short setters
-  void addParcList(Parc parc) => _parcList.add(parc);
+  void addParc(Parc parc) => _parcList.add(parc);
+
+  List<Parc> getParcsInBounds(LatLngBounds currentViewBounds) {
+    final filteredParcList = <Parc>[];
+    for (final parc in _parcList) {
+      if (currentViewBounds.isOverlapping(parc.geojsonFeature.latLngBounds)) {
+        filteredParcList.add(parc);
+      }
+    }
+    return filteredParcList;
+  }
+
+  List<Parc> getParcsOnPoint(LatLng point) {
+    final filteredParcList = <Parc>[];
+    for (final parc in _parcList) {
+      if (parc.geojsonFeature.isInFeatureBounds(point)) {
+        filteredParcList.add(parc);
+      }
+    }
+    return filteredParcList;
+  }
 
   @override
   String toString() {
@@ -70,7 +94,7 @@ class ParcList {
 
 Future<List<Parc>> fetchParcs(List<Parc> parcList) async {
   int limit = 3;
-  final start_time = DateTime.now();
+  final startTime = DateTime.now();
 
   final response = await http.get(Uri.parse(
       'https://data.laregion.fr/api/v2/catalog/datasets/parcs-naturels-regionaux/records?limit=3&offset=0'));
@@ -83,13 +107,13 @@ Future<List<Parc>> fetchParcs(List<Parc> parcList) async {
   int totalCount = jsonDecode(response.body)["total_count"];
   print("Retrieving $totalCount parcs...");
 
-  List<Future<dynamic>> response_futures = [];
+  List<Future<dynamic>> responseFutures = [];
   for (var offset = 0; offset < totalCount + limit; offset += limit) {
-    response_futures.add(http.get(Uri.parse(
+    responseFutures.add(http.get(Uri.parse(
         'https://data.laregion.fr/api/v2/catalog/datasets/parcs-naturels-regionaux/records?limit=$limit&offset=$offset')));
   }
 
-  final responses = await Future.wait(response_futures);
+  final responses = await Future.wait(responseFutures);
 
   for (var response in responses) {
     if (response.statusCode == 200) {
@@ -98,10 +122,10 @@ Future<List<Parc>> fetchParcs(List<Parc> parcList) async {
       for (var i = 0; i < json["records"].length; i++) {
         final fields = json["records"][i]["record"]["fields"];
         final parcName = fields["pnr"];
-        final geo_shape = fields["geo_shape"];
+        final geoShape = fields["geo_shape"];
 
         // If no name or no geo_shape, skip
-        if (parcName == null || geo_shape == null) {
+        if (parcName == null || geoShape == null) {
           if (kDebugMode) {
             print("Skipping parc ${parcName ?? ''}");
           }
@@ -121,6 +145,6 @@ Future<List<Parc>> fetchParcs(List<Parc> parcList) async {
     }
   }
   print(
-      "Parcs retrieved in ${DateTime.now().difference(start_time).toString()}");
+      "Parcs retrieved in ${DateTime.now().difference(startTime).toString()}");
   return parcList;
 }

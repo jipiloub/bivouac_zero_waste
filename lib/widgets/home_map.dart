@@ -13,6 +13,8 @@ import 'package:proj4dart/proj4dart.dart' as proj4;
 import 'package:latlong2/latlong.dart';
 import "package:stack_trace/stack_trace.dart";
 
+import '../classes/parc.dart';
+
 class HomeMapWidget extends StatefulWidget {
   const HomeMapWidget({Key? key}) : super(key: key);
 
@@ -30,7 +32,12 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
   final polygons = <Polygon>[];
   final circles = <CircleMarker>[];
 
-  String clickedParc = "";
+  Parc? clickedParc;
+  Parc? hoveredParc;
+  List<Parc> visibleParcList = <Parc>[];
+  Parc? oldClickedParc;
+  Parc? oldHoveredParc;
+  List<Parc> oldVisibleParcList = <Parc>[];
 
   @override
   void initState() {
@@ -57,9 +64,9 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
     CircleMarker circleClickedLocation = CircleMarker(
         point: point,
         radius: 4,
-        color: Colors.lightBlue.withOpacity(0.3),
-        borderColor: Colors.blue,
-        borderStrokeWidth: 0.5);
+        color: Colors.blue.withOpacity(0.5),
+        borderColor: Colors.white,
+        borderStrokeWidth: 1);
     setState(() {
       // Empty the circle list
       while (circles.isNotEmpty) {
@@ -70,35 +77,52 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
     });
   }
 
-  void checkIfClickedInParcs(LatLng point) async {
+  void checkIfParcHovered(LatLng point) async {
     await parcList.futureParcList;
-    final start_time = DateTime.now().millisecondsSinceEpoch;
-    if (kDebugMode) {
-      print("");
-    }
 
-    for (final parc in parcList.parcs) {
-      final feature = parc.geojsonFeature;
-      if (feature.isInGeoJsonFeature(point)) {
-        setState(() {
-          clickedParc = parc.name;
-        });
-        if (kDebugMode) {
-          print("Clicked in ${parc.toString()}");
-          print(
-              "${Trace.current().frames[0].member}: ${DateTime.now().millisecondsSinceEpoch - start_time}ms");
-        }
-        return;
+    final filteredParcList = parcList.getParcsOnPoint(point);
+
+    Parc? tmpHoveredParc;
+    for (Parc parc in filteredParcList) {
+      if (parc.geojsonFeature.isInGeoJsonFeature(point)) {
+        tmpHoveredParc = parc;
       }
     }
 
     setState(() {
-      clickedParc = "";
+      if (hoveredParc != tmpHoveredParc) {
+        hoveredParc = tmpHoveredParc;
+        print("Parc hovered: $hoveredParc");
+        redrawPolygons();
+      }
     });
+  }
+
+  void checkIfClickedInParcs(LatLng point) async {
+    await parcList.futureParcList;
+    final start_time = DateTime.now().millisecondsSinceEpoch;
+
+    Parc? tmpClickedParc;
+    final filteredParcList = parcList.getParcsOnPoint(point);
+    for (Parc parc in filteredParcList) {
+      if (parc.geojsonFeature.isInGeoJsonFeature(point)) {
+        tmpClickedParc = parc;
+        break;
+      }
+    }
+
     if (kDebugMode) {
       print(
           "${Trace.current().frames[0].member}: ${DateTime.now().millisecondsSinceEpoch - start_time}ms");
     }
+
+    setState(() {
+      if (clickedParc != tmpClickedParc) {
+        clickedParc = tmpClickedParc;
+        print("Parc clicked: $clickedParc");
+        redrawPolygons();
+      }
+    });
   }
 
   String getFormattedClickedLocation() {
@@ -107,61 +131,76 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
 
   void updateVisibleParcs() async {
     await parcList.futureParcList;
-    final start_time = DateTime.now().millisecondsSinceEpoch;
-
-    if (kDebugMode) {
-      print("");
-    }
 
     final currentViewBounds = _mapController.bounds ?? LatLngBounds();
     if (currentViewBounds.isValid == false) {
-      print("WARNING: current view has no bounds");
       return;
     }
-    print(
-        "View bounds: [[${currentViewBounds.east}, ${currentViewBounds.west}],"
-        " [${currentViewBounds.north}, ${currentViewBounds.south}]");
 
-    // Remove displayed polygons
-    setState(() {
-      while (polygons.isNotEmpty) {
-        polygons.removeLast();
-      }
-    });
+    visibleParcList = parcList.getParcsInBounds(currentViewBounds);
 
-    for (final parc in parcList.parcs) {
-      switch (parc.geojsonFeature.type) {
-        case FeatureType.GeoJsonPolygon:
-          {
-            final feature = parc.geojsonFeature as GeoJsonPolygon;
-            if (currentViewBounds.isOverlapping(feature.latLngBounds)) {
-              print("${parc.name} is in the view");
-              setState(() {
-                polygons.add(feature.convertToFlutterMapFormat());
-              });
-            }
-          }
+    redrawPolygons();
+  }
+
+  void redrawPolygons() async {
+    bool visibleParcListChanged = false;
+    if (visibleParcList.length != oldVisibleParcList.length) {
+      visibleParcListChanged = true;
+    } else {
+      for (Parc parc in visibleParcList) {
+        final index = oldVisibleParcList
+            .indexWhere((element) => element.name == parc.name);
+        if (index >= 0) {
+          // Item from new list can be found in old list. Go to next items...
+          continue;
+        } else {
+          // Item from new list CANNOT be found in old list. The lists are different. Stop here...
+          visibleParcListChanged = true;
           break;
-        case FeatureType.GeoJsonMultiPolygon:
-          {
-            final feature = parc.geojsonFeature as GeoJsonMultiPolygon;
-            if (currentViewBounds.isOverlapping(feature.latLngBounds)) {
-              print("${parc.name} is in the view");
-              setState(() {
-                polygons.addAll(feature.convertToFlutterMapFormat());
-              });
-            }
-          }
-          break;
-        default:
-          {
-            throw Exception("Error: Unknown type: ${parc.geojsonFeature.type}");
-          }
+        }
       }
     }
-
-    print(
-        "${Trace.current().frames[0].member}: ${DateTime.now().millisecondsSinceEpoch - start_time}ms");
+    if (visibleParcListChanged ||
+        clickedParc != oldClickedParc ||
+        hoveredParc != oldHoveredParc) {
+      setState(() {
+        // Remove displayed polygons
+        while (polygons.isNotEmpty) {
+          polygons.removeLast();
+        }
+      });
+      for (Parc parc in visibleParcList) {
+        if (hoveredParc != null) {
+          if (parc.name == hoveredParc!.name) {
+            continue;
+          }
+        }
+        if (clickedParc != null) {
+          if (parc.name == clickedParc!.name) {
+            continue;
+          }
+        }
+        setState(() {
+          polygons.addAll(parc.geojsonFeature.convertToFlutterMapFormat());
+        });
+      }
+      final hoveredAndClickedColor = Colors.blue.withOpacity(0.3);
+      const hoveredAndClickedBorderColor = Colors.white;
+      if (hoveredParc != null) {
+        polygons.addAll(hoveredParc!.geojsonFeature.convertToFlutterMapFormat(
+            color: hoveredAndClickedColor,
+            borderColor: hoveredAndClickedBorderColor));
+      }
+      // If clicked parc is different than hovered parc
+      if (clickedParc != null && clickedParc != hoveredParc) {
+        polygons.addAll(clickedParc!.geojsonFeature.convertToFlutterMapFormat(
+            color: hoveredAndClickedColor,
+            borderColor: hoveredAndClickedBorderColor));
+      }
+      oldVisibleParcList = visibleParcList;
+      oldClickedParc = clickedParc;
+      oldHoveredParc = hoveredParc;
+    }
   }
 
   @override
@@ -172,30 +211,34 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
             child: FlutterMap(
           mapController: _mapController,
           options: MapOptions(
-              center: initialCenter,
-              zoom: 9,
-              interactiveFlags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-              onTap: (tapPosition, p) {
-                displayCircleAtClick(p);
-                checkIfClickedInParcs(p);
-              },
-              // Update the visible parcs while the map is moving. Does not seem
-              // to work on phones.
-              // onPositionChanged: (a, b) {
-              //   updateVisibleParcs();
-              // }
-              onMapEvent: (mapEvent) {
-                if (mapEvent.runtimeType == MapEventMoveEnd) {
+            center: initialCenter,
+            zoom: 9,
+            interactiveFlags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+            // Update the visible parcs while the map is moving. Does not seem
+            // to work on phones.
+            // onPositionChanged: (a, b) {
+            //   updateVisibleParcs();
+            // }
+            onMapEvent: (mapEvent) {
+              if (mapEvent.runtimeType == MapEventMoveEnd) {
+                updateVisibleParcs();
+              }
+              if (getPlatform() != PlatformCustom.webMobile) {
+                if (mapEvent.runtimeType == MapEventFlingAnimation ||
+                    mapEvent.runtimeType == MapEventScrollWheelZoom ||
+                    mapEvent.runtimeType == MapEventMove) {
                   updateVisibleParcs();
                 }
-                if (getPlatform() != PlatformCustom.webMobile) {
-                  if (mapEvent.runtimeType == MapEventFlingAnimation ||
-                      mapEvent.runtimeType == MapEventScrollWheelZoom ||
-                      mapEvent.runtimeType == MapEventMove) {
-                    updateVisibleParcs();
-                  }
-                }
-              }),
+              }
+            },
+            onPointerHover: (event, point) {
+              checkIfParcHovered(point);
+            },
+            onTap: (tapPosition, point) {
+              displayCircleAtClick(point);
+              checkIfClickedInParcs(point);
+            },
+          ),
           nonRotatedChildren: [
             AttributionWidget.defaultWidget(
               source: 'OpenStreetMap contributors',
@@ -230,9 +273,10 @@ class _HomeMapWidgetState extends State<HomeMapWidget> {
                     },
                   ),
                   GestureDetector(
-                    child: Text(clickedParc),
+                    child: Text(clickedParc != null ? clickedParc!.name : ""),
                     onLongPress: () {
-                      Clipboard.setData(ClipboardData(text: clickedParc));
+                      Clipboard.setData(ClipboardData(
+                          text: clickedParc != null ? clickedParc!.name : ""));
                       const snackBar =
                           SnackBar(content: Text("Copied to Clipboard"));
                       ScaffoldMessenger.of(context).showSnackBar(snackBar);
